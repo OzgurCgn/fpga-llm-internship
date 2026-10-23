@@ -1,0 +1,37 @@
+name: Serial MAC RTL simulation and synthesis
+on:
+  push:
+    paths:
+      - 'rtl/dot4_serial.sv'
+      - 'rtl/tb_dot4.sv'
+      - '.github/workflows/mac-rtl.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mac-rtl:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install RTL tools
+        run: sudo apt-get update -qq && sudo apt-get install -y iverilog yosys
+      - name: RTL verification and VCD
+        run: |
+          mkdir -p artifacts
+          iverilog -g2012 -s tb_dot4 -o artifacts/dot4.vvp rtl/dot4_serial.sv rtl/tb_dot4.sv
+          (cd artifacts && vvp dot4.vvp) | tee artifacts/mac_sim.txt
+      - name: Yosys synthesis report
+        run: |
+          yosys -Q -T -p 'read_verilog -sv rtl/dot4_serial.sv; hierarchy -top dot4_serial; proc; opt; techmap; opt; stat' | tee artifacts/mac_synth.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-rtl-evidence
+          path: artifacts/*.txt
+          retention-days: 60
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-waveform
+          path: artifacts/*.vcd
+          retention-days: 60
