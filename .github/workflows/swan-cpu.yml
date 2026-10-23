@@ -1,0 +1,53 @@
+name: Real Swan 15M CPU inference
+on:
+  push:
+    paths:
+      - '.github/workflows/swan-cpu.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  swan-cpu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch reference project and model
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          git clone --depth 1 https://github.com/turingmotors/swan.git swan-upstream
+          mkdir -p swan-upstream/model
+          curl -fL --retry 3 --connect-timeout 20 --max-time 200 'https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin' -o swan-upstream/model/stories15M.bin
+          curl -fL --retry 3 --connect-timeout 20 --max-time 120 'https://raw.githubusercontent.com/leloykun/llama2.cpp/master/tokenizer.bin' -o swan-upstream/model/tokenizer.bin
+          (cd swan-upstream && git rev-parse HEAD) | tee artifacts/swan_source_sha.txt
+          sha256sum swan-upstream/model/*.bin | tee artifacts/model_checksums.txt
+          wc -c swan-upstream/model/*.bin | tee artifacts/model_sizes.txt
+      - name: Build Swan original CPU runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S swan-upstream -B swan-upstream/build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee artifacts/swan_cmake.txt
+          cmake --build swan-upstream/build -j 2 2>&1 | tee artifacts/swan_build.txt
+      - name: Execute original 15M Swan model
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd swan-upstream && timeout 240 ./build/swan --max_seq 32 --temp 0) 2>&1 | tee artifacts/swan_generation.txt
+          grep -q 'Speed:' artifacts/swan_generation.txt
+          grep -q 'Hyper Parameters' artifacts/swan_generation.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('artifacts/swan_generation.txt').read_text(errors='replace')
+          assert 'dim ' in s and 'vocab_size' in s
+          assert 'Speed:' in s
+          print('PASS original Swan inference: BOS token -> 32 generated tokens; NOT an arbitrary text prompt')
+          PY
+      - name: Preserve reproducibility evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swan-15m-cpu-evidence
+          path: artifacts/
+          retention-days: 60
