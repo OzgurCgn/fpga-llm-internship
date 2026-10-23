@@ -1,0 +1,10 @@
+build/
+*.vcd
+*.vvp
+*.log
+*.jou
+*.str
+matvec_accel/
+.Xil/
+*.pyc
+__pycache__/
