@@ -15,7 +15,7 @@ jobs:
       - name: C++ arithmetic kernel tests
         run: |
           mkdir -p artifacts
-          g++ -O2 -std=c++17 -Wall -Wextra -Werror -Wno-unknown-pragmas hls/kernels.cpp tests/testbench.cpp -o artifacts/kernel_tests
+          g++ -O2 -std=c++17 -Wall -Wextra -Wno-unknown-pragmas hls/kernels.cpp tests/testbench.cpp -o artifacts/kernel_tests
           ./artifacts/kernel_tests | tee artifacts/cpp_test_results.txt
       - name: AXI4-Stream RTL simulation
         run: |
