@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   hls:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -29,12 +29,13 @@ jobs:
           mkdir -p artifacts
           cd artifacts
           set +e
-          timeout 900 env APPIMAGE_EXTRACT_AND_RUN=1 ../bambu.AppImage "${GITHUB_WORKSPACE}/hls/bambu_dot4.c" --top-fname=dot4_bambu --clock-period=10 -O2 --no-clean --generate-tb="${GITHUB_WORKSPACE}/hls/bambu_dot4_test.xml" --simulate --simulator=VERILATOR > bambu_log.txt 2>&1
+          timeout 900 env APPIMAGE_EXTRACT_AND_RUN=1 ../bambu.AppImage "${GITHUB_WORKSPACE}/hls/bambu_dot4.c" --top-fname=dot4_bambu --clock-period=10 -O2 --no-clean --output-level=3 > bambu_log.txt 2>&1
           status=$?
           set -e
           cat bambu_log.txt
           echo "BAMBU_EXIT_STATUS=$status" | tee status.txt
           find . -maxdepth 12 -type f | head -150 | tee artifact_inventory.txt
+          find "${GITHUB_WORKSPACE}" /tmp -maxdepth 6 -type f \( -name "*.v" -o -name "*.sv" \) 2>/dev/null | head -100 | tee all_verilog_inventory.txt
           find . -maxdepth 12 -type f -name '*.v' -print | tee generated_verilog_files.txt
           test -s generated_verilog_files.txt
           echo "PASS Bambu generated Verilog RTL"
@@ -46,6 +47,7 @@ jobs:
             artifacts/bambu_log.txt
             artifacts/status.txt
             artifacts/artifact_inventory.txt
+            artifacts/all_verilog_inventory.txt
             artifacts/generated_verilog_files.txt
             artifacts/*.v
             artifacts/HLS_output/**/*.v
