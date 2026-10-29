@@ -28,8 +28,8 @@ jobs:
         run: |
           mkdir -p artifacts
           cd artifacts
-          timeout 900 env APPIMAGE_EXTRACT_AND_RUN=1 ../bambu.AppImage ../hls/bambu_dot4.c --top-fname=dot4_bambu --clock-period=10 -O2 2>&1 | tee bambu_log.txt
-          find . -maxdepth 4 -type f -name '*.v' -print | tee generated_verilog_files.txt
+          timeout 900 env APPIMAGE_EXTRACT_AND_RUN=1 ../bambu.AppImage "${GITHUB_WORKSPACE}/hls/bambu_dot4.c" --top-fname=dot4_bambu --clock-period=10 -O2 2>&1 | tee bambu_log.txt
+          find . -maxdepth 8 -type f -name '*.v' -print | tee generated_verilog_files.txt
           test -s generated_verilog_files.txt
           echo "PASS Bambu generated Verilog RTL"
       - uses: actions/upload-artifact@v4
@@ -41,4 +41,5 @@ jobs:
             artifacts/generated_verilog_files.txt
             artifacts/*.v
             artifacts/HLS_output/**/*.v
+            artifacts/**/*.v
           retention-days: 60
