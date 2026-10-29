@@ -1,0 +1,54 @@
+name: Xilinx Series 7 technology-mapped RTL synthesis
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'rtl/*.sv'
+      - '.github/workflows/xilinx-map.yml'
+permissions:
+  contents: read
+jobs:
+  mapped:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Yosys and Icarus
+        run: sudo apt-get update -qq && sudo apt-get install -y yosys iverilog
+      - name: Perform functional simulation
+        run: |
+          mkdir -p evidence
+          iverilog -g2012 -s tb_dot4_parallel -o evidence/dot4_parallel.vvp rtl/dot4_parallel.sv rtl/tb_dot4_parallel.sv
+          (cd evidence && vvp dot4_parallel.vvp) | tee evidence/sim_parallel.txt
+          grep -q 'PASS all 103 test vectors' evidence/sim_parallel.txt
+          iverilog -g2012 -s tb_dot4 -o evidence/dot4_serial.vvp rtl/dot4_serial.sv rtl/tb_dot4.sv
+          (cd evidence && vvp dot4_serial.vvp) | tee evidence/sim_serial.txt
+      - name: Map two arithmetic designs to XC7 primitives
+        run: |
+          set -euo pipefail
+          for top in dot4_parallel dot4_serial; do
+            yosys -Q -T -l "evidence/${top}_xc7.log" -p "read_verilog -sv rtl/${top}.sv; synth_xilinx -family xc7 -top ${top} -flatten -noclkbuf; stat; write_json evidence/${top}_mapped.json"
+            python3 - "${top}" <<'PY'
+          import json,sys,collections
+          top=sys.argv[1]
+          with open(f'evidence/{top}_mapped.json') as f: data=json.load(f)
+          counts=collections.Counter(cell['type'] for cell in data['modules'][top]['cells'].values())
+          for k,v in sorted(counts.items()):
+              if k.startswith(('LUT','FD','DSP','CARRY','MUXF','IBUF','OBUF','BUFG')):
+                  print(f'{top},{k},{v}')
+          with open(f'evidence/{top}_primitive_counts.csv','w') as f:
+              f.write('primitive,count\n')
+              for k,v in sorted(counts.items()): f.write(f'{k},{v}\n')
+          PY
+          done
+      - name: Save all simulation/synthesis evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xc7-rtl-mapping-and-waveform
+          path: |
+            evidence/*.txt
+            evidence/*.log
+            evidence/*.csv
+            evidence/*.vcd
+          retention-days: 75
