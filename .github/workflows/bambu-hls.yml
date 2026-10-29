@@ -1,0 +1,44 @@
+name: Free Bambu HLS C-to-RTL experiment
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'hls/bambu_dot4.c'
+      - '.github/workflows/bambu-hls.yml'
+permissions:
+  contents: read
+jobs:
+  hls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bambu AppImage runtime and RTL tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libfuse2t64 gcc-multilib g++-multilib iverilog verilator
+      - name: Get official Bambu HLS release
+        run: |
+          curl -fL --retry 3 --connect-timeout 20 --max-time 240 https://release.bambuhls.eu/bambu-latest.AppImage -o bambu.AppImage
+          chmod +x bambu.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 ./bambu.AppImage --help > bambu-help.txt 2>&1
+          head -n 12 bambu-help.txt
+      - name: Synthesize signed MAC from C to RTL
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cd artifacts
+          timeout 900 env APPIMAGE_EXTRACT_AND_RUN=1 ../bambu.AppImage ../hls/bambu_dot4.c --top-fname=dot4_bambu --clock-period=10 -O2 2>&1 | tee bambu_log.txt
+          find . -maxdepth 4 -type f -name '*.v' -print | tee generated_verilog_files.txt
+          test -s generated_verilog_files.txt
+          echo "PASS Bambu generated Verilog RTL"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bambu-hls-evidence
+          path: |
+            artifacts/bambu_log.txt
+            artifacts/generated_verilog_files.txt
+            artifacts/*.v
+            artifacts/HLS_output/**/*.v
+          retention-days: 60
