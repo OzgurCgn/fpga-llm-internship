@@ -29,7 +29,7 @@ jobs:
           mkdir -p artifacts
           cd artifacts
           set +e
-          timeout 900 env APPIMAGE_EXTRACT_AND_RUN=1 ../bambu.AppImage "${GITHUB_WORKSPACE}/hls/bambu_dot4.c" --top-fname=dot4_bambu --clock-period=10 -O2 --no-clean --generate-tb="${GITHUB_WORKSPACE}/hls/bambu_dot4_test.xml" --simulate --simulator=ICARUS > bambu_log.txt 2>&1
+          timeout 900 env APPIMAGE_EXTRACT_AND_RUN=1 ../bambu.AppImage "${GITHUB_WORKSPACE}/hls/bambu_dot4.c" --top-fname=dot4_bambu --clock-period=10 -O2 --no-clean --generate-tb="${GITHUB_WORKSPACE}/hls/bambu_dot4_test.xml" --simulate --simulator=VERILATOR > bambu_log.txt 2>&1
           status=$?
           set -e
           cat bambu_log.txt
